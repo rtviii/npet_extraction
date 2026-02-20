@@ -1,0 +1,10 @@
+
+numpy
+scipy
+pyvista
+open3d
+biopython
+scikit-learn
+pydantic>=2
+requests
+plyfile
