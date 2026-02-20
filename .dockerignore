@@ -1,0 +1,5 @@
+.venv
+npet2_data
+*.egg-info
+__pycache__
+.git

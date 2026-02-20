@@ -1,0 +1,10 @@
+services:
+  npet2:
+    build: .
+    image: npet2:latest
+    volumes:
+      - ${NPET2_DATA:-./npet2_data}:/data
+    environment:
+      - NPET2_RIBOXYZ_API_URL=${NPET2_RIBOXYZ_API_URL:-http://host.docker.internal:8000}
+    # pass arbitrary CLI args after --
+    # docker compose run npet2 run 5NWY

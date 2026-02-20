@@ -1,0 +1,8 @@
+*npet2_data
+npet2_data
+npet2_data/**
+
+
+*venv
+*egg-info
+structures
