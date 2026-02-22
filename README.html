@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.54">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>readme</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="README_files/libs/clipboard/clipboard.min.js"></script>
+<script src="README_files/libs/quarto-html/quarto.js"></script>
+<script src="README_files/libs/quarto-html/popper.min.js"></script>
+<script src="README_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="README_files/libs/quarto-html/anchor.min.js"></script>
+<link href="README_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="README_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="README_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="README_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="README_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<!-- TOP: side-by-side GIFs -->
+<p align="center">
+<img src="docs/grid0.5.gif" width="49%" alt="NPET2 grid refine (0.5Å)"> <img src="docs/grid1.0.gif" width="49%" alt="NPET2 coarse grid (1.0Å)">
+</p>
+<section id="npet2-npet_extraction" class="level1">
+<h1>npet2 (npet_extraction)</h1>
+<p>npet2 is a standalone ribosome <strong>nascent peptide exit tunnel (NPET)</strong> geometry pipeline. Given an RCSB structure ID (or a local mmCIF) it:</p>
+<ul>
+<li>acquires <strong>landmarks</strong> (PTC + constriction site)</li>
+<li>defines a <strong>canonical tunnel axis frame</strong> (PTC → constriction = +Z, “C0” frame)</li>
+<li>computes <strong>empty space</strong> inside an exterior ribosome shell within a cylinder around the tunnel axis</li>
+<li><strong>clusters</strong> the empty-space voxels to isolate the NPET void</li>
+<li>optionally runs a <strong>refinement pass</strong> on a smaller ROI at higher resolution</li>
+<li><strong>meshes</strong> the tunnel void (marching cubes + smoothing) and validates watertightness</li>
+<li>reports <strong>tunnel lining chains</strong> by proximity of atoms to the final mesh</li>
+</ul>
+<p>Defaults are “API-first”: profile + landmarks come from <strong>ribosome.xyz</strong>, and mmCIF is downloaded from <strong>RCSB</strong> unless you provide a local mmCIF.</p>
+<hr>
+<section id="installation-local" class="level2">
+<h2 class="anchored" data-anchor-id="installation-local">Installation (local)</h2>
+<section id="requirements" class="level3">
+<h3 class="anchored" data-anchor-id="requirements">Requirements</h3>
+<ul>
+<li>Python <strong>&gt;= 3.10</strong> (Docker image uses 3.11)</li>
+<li>On Linux you typically also need system libs for PyVista/VTK rendering deps:
+<ul>
+<li><code>libgomp1</code> and <code>libglib2.0-0</code> (these are installed in the Dockerfile; for local installs your distro packages may vary)</li>
+</ul></li>
+</ul>
+</section>
+<section id="install" class="level3">
+<h3 class="anchored" data-anchor-id="install">Install</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>this-repo<span class="op">&gt;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> <span class="op">&lt;</span>this-repo<span class="op">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> venv .venv</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> .venv/bin/activate</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-U</span> pip setuptools</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install .</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="verify" class="level3">
+<h3 class="anchored" data-anchor-id="verify">Verify</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> <span class="at">--help</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> show-config</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<hr>
+</section>
+</section>
+<section id="installation-usage-docker" class="level2">
+<h2 class="anchored" data-anchor-id="installation-usage-docker">Installation &amp; usage (Docker)</h2>
+<section id="build" class="level3">
+<h3 class="anchored" data-anchor-id="build">Build</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-t</span> npet2:latest .</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="run-with-a-mounted-data-directory" class="level3">
+<h3 class="anchored" data-anchor-id="run-with-a-mounted-data-directory">Run with a mounted data directory</h3>
+<p>All outputs, caches, and downloaded mmCIFs are written under <code>/data</code> inside the container.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ./npet2_data</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">--rm</span> <span class="at">-it</span> <span class="dt">\</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-v</span> <span class="st">"</span><span class="va">$(</span><span class="bu">pwd</span><span class="va">)</span><span class="st">/npet2_data:/data"</span> <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  npet2:latest run 5NWY</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="use-a-custom-ribosome.xyz-compatible-api-endpoint" class="level3">
+<h3 class="anchored" data-anchor-id="use-a-custom-ribosome.xyz-compatible-api-endpoint">Use a custom ribosome.xyz-compatible API endpoint</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">--rm</span> <span class="at">-it</span> <span class="dt">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-e</span> NPET2_RIBOXYZ_API_URL=<span class="st">"https://api.ribosome.xyz"</span> <span class="dt">\</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-v</span> <span class="st">"</span><span class="va">$(</span><span class="bu">pwd</span><span class="va">)</span><span class="st">/npet2_data:/data"</span> <span class="dt">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  npet2:latest run 5NWY</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="docker-compose" class="level3">
+<h3 class="anchored" data-anchor-id="docker-compose">docker compose</h3>
+<p><code>docker-compose.yml</code> mounts <code>${NPET2_DATA:-./npet2_data}</code> to <code>/data</code> and lets you override the API URL.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># default volume ./npet2_data -&gt; /data</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose run <span class="at">--rm</span> npet2 run 5NWY</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># override data dir + API url</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="va">NPET2_DATA</span><span class="op">=</span>/absolute/path/to/npet2_data <span class="dt">\</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="va">NPET2_RIBOXYZ_API_URL</span><span class="op">=</span>https://api.ribosome.xyz <span class="dt">\</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose run <span class="at">--rm</span> npet2 run 5NWY</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<hr>
+</section>
+</section>
+<section id="environment-variables" class="level2">
+<h2 class="anchored" data-anchor-id="environment-variables">Environment variables</h2>
+<p>These are the most relevant knobs for paths and external dependencies (see <code>libnpet/core/config.py</code>):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 39%">
+<col style="width: 46%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>NPET2_ROOT</code></td>
+<td><code>~/.npet2</code> (local) / <code>/data</code> (docker)</td>
+<td>Root for all npet2 data</td>
+</tr>
+<tr class="even">
+<td><code>NPET2_RUNS_ROOT</code></td>
+<td><code>$NPET2_ROOT/runs</code></td>
+<td>Where run outputs are written (<strong>this is effectively your “output log root”</strong>)</td>
+</tr>
+<tr class="odd">
+<td><code>NPET2_CACHE_ROOT</code></td>
+<td><code>$NPET2_ROOT/cache</code></td>
+<td>Stage cache directory (re-uses expensive outputs like exterior shell)</td>
+</tr>
+<tr class="even">
+<td><code>NPET2_POISSON_RECON_BIN</code></td>
+<td><code>$NPET2_ROOT/bin/PoissonRecon</code></td>
+<td>Optional external binary location (used by legacy/optional reconstruction helpers)</td>
+</tr>
+<tr class="odd">
+<td><code>NPET2_RIBOXYZ_API_URL</code></td>
+<td><code>http://localhost:8000</code> (local) / <code>https://api.ribosome.xyz</code> (docker)</td>
+<td>Base URL for profile/landmark fetches</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Where does output get logged?</strong> The pipeline prints to stdout/stderr. Persisted run state and artifacts are written under:</p>
+<ul>
+<li><code>${NPET2_RUNS_ROOT}/{RCSB_ID}/{RUN_ID}/...</code></li>
+</ul>
+<p>The canonical “run record” is:</p>
+<ul>
+<li><code>${NPET2_RUNS_ROOT}/{RCSB_ID}/{RUN_ID}/manifest.json</code></li>
+</ul>
+<hr>
+</section>
+<section id="output-structure" class="level2">
+<h2 class="anchored" data-anchor-id="output-structure">Output structure</h2>
+<p>A single run lives at:</p>
+<pre><code>{NPET2_RUNS_ROOT}/{RCSB_ID}/{RUN_ID}/
+├── manifest.json
+├── stage/
+│   ├── 00_inputs/
+│   ├── 10_landmarks/
+│   ├── 20_exterior_shell/
+│   ├── 30_region_atoms/
+│   ├── 40_empty_space/
+│   ├── 50_clustering/
+│   ├── 55_grid_refine/
+│   ├── 70_mesh_validate/
+│   └── 80_tunnel_lining/
+├── tunnel_mesh.ply
+├── tunnel_mesh_ascii.ply
+├── tunnel_lining.json
+└── tunnel_lining.cif</code></pre>
+<section id="manifest.json" class="level3">
+<h3 class="anchored" data-anchor-id="manifest.json"><code>manifest.json</code></h3>
+<p>A machine-readable run ledger (<code>libnpet/core/manifest.py</code>) containing:</p>
+<ul>
+<li>inputs fingerprints (what files/API endpoints were used)</li>
+<li>resolved config parameters</li>
+<li>per-stage status/timing + parameters</li>
+<li>a list of produced artifacts (type, stage, path, metadata)</li>
+</ul>
+</section>
+<section id="stage-folders-what-to-expect" class="level3">
+<h3 class="anchored" data-anchor-id="stage-folders-what-to-expect">Stage folders (what to expect)</h3>
+<ul>
+<li><p><strong><code>stage/00_inputs/</code></strong></p>
+<ul>
+<li><code>atom_xyz.npy</code>: all atoms loaded from the mmCIF (float32, shape Nx3)</li>
+</ul></li>
+<li><p><strong><code>stage/10_landmarks/</code></strong></p>
+<ul>
+<li><code>ptc.json</code>: <code>{"location":[x,y,z]}</code> (Å)</li>
+<li><code>constriction_site.json</code>: <code>{"location":[x,y,z]}</code> (Å) plus metadata in manifest</li>
+</ul></li>
+<li><p><strong><code>stage/20_exterior_shell/</code></strong></p>
+<ul>
+<li><code>ribosome_ptcloud.npy</code>: atom point cloud used for the shell</li>
+<li><code>alpha_shell.ply</code>: watertight exterior shell mesh (best-effort)</li>
+<li><code>alpha_shell_quality.json</code>: manifold/open-edges/bounds diagnostics</li>
+</ul></li>
+<li><p><strong><code>stage/30_region_atoms/</code></strong></p>
+<ul>
+<li><code>region_atom_xyz.npy</code>: seed atoms (walls-only chains) within the cylinder</li>
+<li><code>region_atom_xyz_occ.npy</code>: occupancy atoms used for empty-space exclusion</li>
+<li><code>atom_selection_policy.json</code>: included/excluded chains and reasons</li>
+</ul></li>
+<li><p><strong><code>stage/40_empty_space/</code></strong></p>
+<ul>
+<li><code>empty_points_level_*.npy</code>: empty voxel centers inside shell &amp; cylinder</li>
+<li><code>empty_points_level_*_preclip.npy</code>: before shell “inside” filtering</li>
+<li>For <code>edt</code> backend levels: <code>occupancy_grid_*_{data.npy,spec.json}</code>, <code>empty_mask_*_{data.npy,spec.json}</code></li>
+<li><code>clipping_note.json</code>: whether shell was watertight and how clipping was done</li>
+</ul></li>
+<li><p><strong><code>stage/50_clustering/</code></strong></p>
+<ul>
+<li><p><code>coarse/</code> and <code>refine/</code> DBSCAN dumps:</p>
+<ul>
+<li><code>points.npy</code>, <code>labels.npy</code>, <code>index.json</code>, and <code>cluster_idX.npy</code></li>
+</ul></li>
+<li><p><code>largest_cluster.npy</code>: selected cluster from coarse pass (by proximity to constriction)</p></li>
+<li><p><code>refined_cluster.npy</code>: selected cluster from refine pass</p></li>
+<li><p><code>mesh_level_0.ply</code> (+ <code>*_ascii.ply</code>, <code>*_pre_smooth.ply</code>) if meshing enabled</p></li>
+</ul></li>
+<li><p><strong><code>stage/55_grid_refine/</code></strong></p>
+<ul>
+<li><p>ROI + refined DBSCAN/void masks at ~0.5Å (default):</p>
+<ul>
+<li><code>roi_bbox_c0.json</code>, <code>grid_spec_level_1.json</code></li>
+<li><code>occupied_mask_level_1.npy</code>, <code>void_mask_level_1.npy</code></li>
+<li><code>selected_void_component_mask_level_1.npy</code> (preferred for meshing)</li>
+<li><code>coarse/</code> and <code>refine/</code> DBSCAN outputs</li>
+<li><code>refined_surface_points_level_1.npy</code></li>
+<li><code>mesh_level_1.ply</code> (+ ascii / pre_smooth) if enabled</li>
+</ul></li>
+</ul></li>
+<li><p><strong><code>stage/70_mesh_validate/</code></strong></p>
+<ul>
+<li><code>npet2_tunnel_mesh.ply</code> (final chosen mesh; must be watertight)</li>
+<li><code>comparison_mesh_level_{0,1}*.ply</code> copies for debugging</li>
+</ul></li>
+<li><p><strong><code>stage/80_tunnel_lining/</code></strong></p>
+<ul>
+<li><code>tunnel_lining.json</code>: chains within a distance threshold of the mesh</li>
+<li><code>tunnel_lining.cif</code>: subset mmCIF containing qualifying chains</li>
+</ul></li>
+</ul>
+</section>
+<section id="convenience-copies-in-run-root" class="level3">
+<h3 class="anchored" data-anchor-id="convenience-copies-in-run-root">Convenience copies in run root</h3>
+<p>After validation/lining:</p>
+<ul>
+<li><code>tunnel_mesh.ply</code>, <code>tunnel_mesh_ascii.ply</code></li>
+<li><code>tunnel_lining.json</code>, <code>tunnel_lining.cif</code></li>
+<li>(and sometimes the level meshes copied up as well)</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="dependency-inputs-local-files-vs-ribosome.xyz-api" class="level2">
+<h2 class="anchored" data-anchor-id="dependency-inputs-local-files-vs-ribosome.xyz-api">Dependency inputs: local files vs ribosome.xyz API</h2>
+<p>npet2 supports <strong>three dependency types</strong>:</p>
+<ol type="1">
+<li><strong>mmCIF structure</strong> (atoms)</li>
+<li><strong>ribosome profile</strong> (chain metadata &amp; assembly map)</li>
+<li><strong>landmarks</strong>: <strong>PTC</strong> + <strong>constriction site</strong></li>
+</ol>
+<section id="default-behavior-no-files-provided" class="level3">
+<h3 class="anchored" data-anchor-id="default-behavior-no-files-provided">Default behavior (no files provided)</h3>
+<ul>
+<li>mmCIF: downloaded from RCSB and cached under <code>${NPET2_ROOT}/mmcif/{RCSB_ID}/{RCSB_ID}.cif</code></li>
+<li>profile: fetched from ribosome.xyz-compatible API</li>
+<li>landmarks: fetched from ribosome.xyz-compatible API</li>
+</ul>
+</section>
+<section id="mixed-behavior" class="level3">
+<h3 class="anchored" data-anchor-id="mixed-behavior">Mixed behavior</h3>
+<p>You can provide any subset as local files. Any omitted dependency falls back to API (except mmCIF, which falls back to RCSB download).</p>
+<section id="examples" class="level4">
+<h4 class="anchored" data-anchor-id="examples">Examples</h4>
+<p><strong>API-only (recommended default)</strong></p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> run 5NWY <span class="at">--api-url</span> https://api.ribosome.xyz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>Local mmCIF, API for profile + landmarks</strong></p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> run 5NWY <span class="at">--mmcif</span> /path/to/5NWY.cif</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>Local profile + landmarks, mmCIF auto-download</strong></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> run 5NWY <span class="dt">\</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--profile</span> /path/to/5NWY_profile.json <span class="dt">\</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--ptc</span> /path/to/5NWY_PTC.json <span class="dt">\</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--constriction</span> /path/to/5NWY_CONSTRICTION_SITE.json</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>All-local</strong></p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npet2</span> run 5NWY <span class="dt">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--mmcif</span> /path/to/5NWY.cif <span class="dt">\</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--profile</span> /path/to/5NWY_profile.json <span class="dt">\</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--ptc</span> /path/to/5NWY_PTC.json <span class="dt">\</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--constriction</span> /path/to/5NWY_CONSTRICTION_SITE.json</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="required-json-schemas" class="level3">
+<h3 class="anchored" data-anchor-id="required-json-schemas">Required JSON schemas</h3>
+<p>These schemas are enforced via pydantic models in <code>libnpet/core/ribosome_types.py</code> and adapters in <code>libnpet/adapters/standalone_providers.py</code>.</p>
+<section id="ptc-json---ptc" class="level4">
+<h4 class="anchored" data-anchor-id="ptc-json---ptc">1) PTC JSON (<code>--ptc</code>)</h4>
+<p>Must validate as <code>PTCInfo</code>:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"location"</span><span class="fu">:</span> <span class="ot">[</span><span class="er">x</span><span class="ot">,</span> <span class="er">y</span><span class="ot">,</span> <span class="er">z</span><span class="ot">]</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li>exactly 3 numeric values (Å)</li>
+<li>extra fields are allowed and ignored</li>
+</ul>
+</section>
+<section id="constriction-json---constriction" class="level4">
+<h4 class="anchored" data-anchor-id="constriction-json---constriction">2) Constriction JSON (<code>--constriction</code>)</h4>
+<p>Must validate as <code>ConstrictionInfo</code>:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"location"</span><span class="fu">:</span> <span class="ot">[</span><span class="er">x</span><span class="ot">,</span> <span class="er">y</span><span class="ot">,</span> <span class="er">z</span><span class="ot">]</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li>exactly 3 numeric values (Å)</li>
+<li>extra fields are allowed and ignored</li>
+</ul>
+</section>
+<section id="profile-json---profile" class="level4">
+<h4 class="anchored" data-anchor-id="profile-json---profile">3) Profile JSON (<code>--profile</code>)</h4>
+<p>Must validate as <code>RibosomeProfile</code>:</p>
+<ul>
+<li><p>top-level:</p>
+<ul>
+<li><code>rcsb_id</code> (string)</li>
+<li><code>mitochondrial</code> (bool, optional)</li>
+<li><code>proteins</code>, <code>rnas</code>, <code>other_polymers</code> (lists, optional)</li>
+<li><code>assembly_map</code> (optional but required if you use <code>occupancy_chain_mode="assembly_all"</code>)</li>
+</ul></li>
+</ul>
+<p>Minimal acceptable example:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"rcsb_id"</span><span class="fu">:</span> <span class="st">"5NWY"</span><span class="fu">,</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mitochondrial"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"proteins"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"auth_asym_id"</span><span class="fu">:</span> <span class="st">"A"</span><span class="fu">,</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"assembly_id"</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"nomenclature"</span><span class="fu">:</span> <span class="ot">[]</span><span class="fu">,</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"rcsb_pdbx_description"</span><span class="fu">:</span> <span class="st">"some protein"</span><span class="fu">,</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"entity_poly_seq_length"</span><span class="fu">:</span> <span class="dv">120</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"rnas"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"auth_asym_id"</span><span class="fu">:</span> <span class="st">"r"</span><span class="fu">,</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"assembly_id"</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"nomenclature"</span><span class="fu">:</span> <span class="ot">[]</span><span class="fu">,</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"rcsb_pdbx_description"</span><span class="fu">:</span> <span class="st">"23S rRNA"</span><span class="fu">,</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"entity_poly_seq_length"</span><span class="fu">:</span> <span class="dv">2900</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"other_polymers"</span><span class="fu">:</span> <span class="ot">[]</span><span class="fu">,</span></span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"assembly_map"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"rcsb_id"</span><span class="fu">:</span> <span class="st">"5NWY"</span><span class="fu">,</span></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"polymer_entity_instances"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>        <span class="fu">{</span><span class="dt">"entity_id"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span> <span class="dt">"auth_asym_id"</span><span class="fu">:</span> <span class="st">"A"</span><span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>        <span class="fu">{</span><span class="dt">"entity_id"</span><span class="fu">:</span> <span class="st">"2"</span><span class="fu">,</span> <span class="dt">"auth_asym_id"</span><span class="fu">:</span> <span class="st">"r"</span><span class="fu">}</span></span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"nonpolymer_entity_instances"</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Notes:</p>
+<ul>
+<li><code>nomenclature</code> can be strings; they are coerced into internal enums.</li>
+<li>If you fetch profile from API, the adapter flattens the <code>assembly_map</code> nesting to match this schema.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="cli-reference" class="level2">
+<h2 class="anchored" data-anchor-id="cli-reference">CLI reference</h2>
+<p>The <code>npet2</code> CLI is defined in <code>libnpet/__main__.py</code> and exposes three commands:</p>
+<section id="npet2-setup" class="level3">
+<h3 class="anchored" data-anchor-id="npet2-setup"><code>npet2 setup</code></h3>
+<p>Builds/install external binaries (currently PoissonRecon) under <code>$NPET2_ROOT/bin/PoissonRecon</code>.</p>
+<p><strong>Options</strong></p>
+<ul>
+<li><code>--data-dir DIR</code>: overrides <code>$NPET2_ROOT</code> for where build artifacts go</li>
+</ul>
+</section>
+<section id="npet2-show-config" class="level3">
+<h3 class="anchored" data-anchor-id="npet2-show-config"><code>npet2 show-config</code></h3>
+<p>Prints default <code>RunConfig</code> as JSON (all pipeline numerical parameters).</p>
+</section>
+<section id="npet2-run" class="level3">
+<h3 class="anchored" data-anchor-id="npet2-run"><code>npet2 run</code></h3>
+<p>Runs the full pipeline on one or more structures.</p>
+<section id="target-selection" class="level4">
+<h4 class="anchored" data-anchor-id="target-selection">Target selection</h4>
+<ul>
+<li><code>npet2 run 5NWY 7K00 ...</code> : positional IDs</li>
+<li><code>--rcsb_id ID</code> : single ID alternative</li>
+<li><code>--from-file FILE</code> : file containing one ID per line</li>
+</ul>
+</section>
+<section id="data-sources-dependency-inputs" class="level4">
+<h4 class="anchored" data-anchor-id="data-sources-dependency-inputs">Data sources (dependency inputs)</h4>
+<ul>
+<li><code>--api-url URL</code> : ribosome.xyz API base URL (overrides <code>NPET2_RIBOXYZ_API_URL</code>)</li>
+<li><code>--mmcif PATH</code> : local mmCIF path (otherwise RCSB download + cache)</li>
+<li><code>--profile PATH</code> : local profile JSON (otherwise API)</li>
+<li><code>--ptc PATH</code> : local PTC JSON (otherwise API)</li>
+<li><code>--constriction PATH</code> : local constriction JSON (otherwise API)</li>
+<li><code>--data-dir DIR</code> : set NPET2 root for mmcif cache/build/runs defaults</li>
+</ul>
+</section>
+<section id="output-control" class="level4">
+<h4 class="anchored" data-anchor-id="output-control">Output control</h4>
+<ul>
+<li><code>--output-dir DIR</code> : override where runs are written (maps to <code>NPET2_RUNS_ROOT</code>)</li>
+</ul>
+</section>
+<section id="parallelism" class="level4">
+<h4 class="anchored" data-anchor-id="parallelism">Parallelism</h4>
+<ul>
+<li><code>--workers, -j N</code> : run multiple RCSB IDs in parallel (each is an independent run)</li>
+</ul>
+</section>
+<section id="advanced-config-overrides-stage-by-stage-meaning" class="level4">
+<h4 class="anchored" data-anchor-id="advanced-config-overrides-stage-by-stage-meaning">Advanced config overrides (stage-by-stage meaning)</h4>
+<p>These flags override fields in <code>RunConfig</code> (<code>libnpet/core/config.py</code>) and affect specific stages:</p>
+<p><strong>Region definition (Stage10/Stage30/Stage40)</strong></p>
+<ul>
+<li><code>--cylinder-radius A</code> → <code>cylinder_radius_A</code> Radius of the cylinder around the tunnel axis used to select atoms and define the search volume.</li>
+<li><code>--cylinder-height A</code> → <code>cylinder_height_A</code> Cylinder extent along +Z (C0 frame) from the constriction direction.</li>
+<li><code>--ptc-extension A</code> → <code>cylinder_ptc_extension_A</code> Extends the cylinder into negative Z (below PTC) to include PTC-adjacent space.</li>
+</ul>
+<p><strong>Grid resolution (Stage40 + Stage50)</strong></p>
+<ul>
+<li><code>--voxel-size A</code> Sets level_0 grid voxel size (creates a single <code>grid_levels=[level_0]</code> entry). This impacts how empty space voxels are generated and thus DBSCAN input density.</li>
+<li><code>--refine-voxel-size A</code> → <code>refine_voxel_size_A</code> Voxel size for Stage55 refinement ROI (default 0.5Å).</li>
+</ul>
+<p><strong>Clustering (Stage50, Stage55)</strong></p>
+<ul>
+<li><code>--dbscan-coarse-eps A</code> → <code>dbscan_level0_coarse_eps_A</code> Coarse DBSCAN radius (Å) for initial cluster merge.</li>
+<li><code>--dbscan-coarse-min-samples N</code> → <code>dbscan_level0_coarse_min_samples</code> Density threshold for coarse DBSCAN.</li>
+<li><code>--dbscan-refine-eps A</code> → <code>dbscan_level0_refine_eps_A</code> Refine DBSCAN radius (Å) applied to the selected coarse cluster.</li>
+<li><code>--dbscan-refine-min-samples N</code> → <code>dbscan_level0_refine_min_samples</code> Density threshold for refine DBSCAN.</li>
+</ul>
+<p><strong>Meshing (Stage50/Stage55/Stage70)</strong></p>
+<ul>
+<li><code>--no-mesh</code> Disables mesh generation at level_0 and level_1 (<code>mesh_level0_enable=False</code>, <code>mesh_level1_enable=False</code>). Stage70 will then fail because it requires a mesh; use this mainly for debugging earlier stages.</li>
+</ul>
+<p><strong>Refinement (Stage55)</strong></p>
+<ul>
+<li><code>--no-refine</code> Intended to skip Stage55 refinement. (Note: if Stage55 is always in the pipeline list, this flag must be honored by code inside Stage55 or by constructing a reduced pipeline. If your current branch still runs Stage55 unconditionally, this flag may not have effect.)</li>
+</ul>
+<p><strong>Tunnel lining (Stage80)</strong></p>
+<ul>
+<li><code>--lining-proximity A</code> → <code>lining_proximity_A</code> Atom-to-mesh distance threshold (Å) for marking chains as “lining”.</li>
+<li><code>--no-nonpolymers</code> → <code>lining_include_nonpolymers=False</code> Excludes nonpolymer ligands/ions from lining output.</li>
+<li><code>--include-waters</code> → <code>lining_include_waters=True</code> Includes water molecules in lining output.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="authorship" class="level2">
+<h2 class="anchored" data-anchor-id="authorship">Authorship</h2>
+<ul>
+<li><strong>Primary author / maintainer:</strong> <em><add names="" here=""></add></em></li>
+<li><strong>Contributors:</strong> <em><add names="" here=""></add></em></li>
+</ul>
+<p>(If you want this to auto-populate from <code>pyproject.toml</code>/Git history, add a <code>CITATION.cff</code> and/or <code>AUTHORS</code> file and link it here.)</p>
+<p>```</p>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
