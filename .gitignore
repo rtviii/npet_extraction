@@ -6,3 +6,5 @@ npet2_data/**
 *venv
 *egg-info
 structures
+
+.DS_Store
