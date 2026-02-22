@@ -1,6 +1,5 @@
 # ribctl/lib/npet2/stages/legacy_minimal.py
 # npet2/stages/legacy_minimal.py
-
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -8,7 +7,8 @@ import time
 from typing import Any, Dict, List, Tuple
 import numpy as np
 import pyvista as pv
-import open3d as o3d
+from scipy import ndimage
+from scipy.ndimage import binary_dilation, binary_closing, gaussian_filter
 
 from libnpet.backends.grid_occupancy import (
     connected_components_3d,
@@ -25,22 +25,14 @@ from libnpet.core.structure_selection import (
     atom_inclusion_policy,
 )
 from libnpet.core.types import StageContext, ArtifactType
-
-from scipy import ndimage
-
 from libnpet.backends.geometry import (
     cif_to_point_cloud,
-    fast_normal_estimation,
-    quick_surface_points,
-    validate_mesh_pyvista,
-    apply_poisson_reconstruction,
     filter_residues_parallel,
     transform_points_to_C0,
     transform_points_from_C0,
     create_point_cloud_mask,
     DBSCAN_capture,
     DBSCAN_pick_largest_cluster,
-    estimate_normals,
 )
 from libnpet.stages.grid_refine import (
     _make_bbox_grid,
@@ -48,8 +40,6 @@ from libnpet.stages.grid_refine import (
     _valid_ijk,
     _voxel_centers_from_indices,
 )
-
-
 
 def _residues_from_chain_ids(structure, chain_ids: set[str]):
     model = structure[0]
@@ -101,6 +91,74 @@ def _get_biopython_structure(ctx: StageContext):
     ctx.inputs["biopython_structure"] = bs
     return bs
 
+import numpy as np
+import pyvista as pv
+from scipy.ndimage import binary_dilation, binary_closing, gaussian_filter
+
+
+def _make_voxel_shell(
+    ptcloud: np.ndarray,
+    voxel_size_A: float = 3.0,
+    dilation_iters: int = 2,
+    closing_iters: int = 6,
+    gaussian_sigma: float = 1.5,
+    fill_holes: float = 2000.0,
+    smooth_iters: int = 20,
+    taubin_pass_band: float = 0.1,
+    pad_A: float = 12.0,
+) -> tuple[pv.PolyData, bool]:
+    """
+    Build a watertight exterior shell from atom point cloud using:
+      voxelization -> dilation -> closing -> gaussian blur -> marching cubes
+
+    Returns (mesh, watertight).
+    """
+    lo = ptcloud.min(axis=0) - pad_A
+    hi = ptcloud.max(axis=0) + pad_A
+
+    shape = tuple((np.ceil((hi - lo) / voxel_size_A).astype(int) + 1).tolist())
+
+    ijk = np.floor((ptcloud - lo[None, :]) / voxel_size_A + 0.5).astype(np.int32)
+    # clip to valid range (should be all valid given padding)
+    for d in range(3):
+        ijk[:, d] = np.clip(ijk[:, d], 0, shape[d] - 1)
+
+    mask = np.zeros(shape, dtype=bool)
+    mask[ijk[:, 0], ijk[:, 1], ijk[:, 2]] = True
+
+    # dilation fills inter-atom gaps, closing seals the tunnel and interior cavities
+    mask = binary_dilation(mask, iterations=dilation_iters)
+    mask = binary_closing(mask, iterations=closing_iters)
+
+    vol = gaussian_filter(mask.astype(np.float32), sigma=gaussian_sigma)
+    vol = np.pad(vol, 2, constant_values=0.0)
+    origin_pad = lo - 2.0 * voxel_size_A
+
+    img = pv.ImageData(
+        dimensions=vol.shape,
+        spacing=(voxel_size_A, voxel_size_A, voxel_size_A),
+        origin=(float(origin_pad[0]), float(origin_pad[1]), float(origin_pad[2])),
+    )
+    img.point_data["values"] = vol.ravel(order="F")
+
+    surf = img.contour(isosurfaces=[0.5], scalars="values").triangulate()
+    if surf.n_points == 0:
+        raise ValueError("voxel shell: marching cubes produced empty surface")
+
+    surf = surf.clean(tolerance=0.0)
+    surf = surf.connectivity(extraction_mode="largest")
+
+    if fill_holes > 0:
+        surf = surf.fill_holes(fill_holes)
+
+    if smooth_iters > 0:
+        surf = surf.smooth_taubin(n_iter=smooth_iters, pass_band=taubin_pass_band)
+
+    surf = surf.triangulate()
+
+    watertight = surf.is_manifold and surf.n_open_edges == 0
+    return surf, watertight
+
 
 class Stage20ExteriorShell(Stage):
     key = "20_exterior_shell"
@@ -108,15 +166,12 @@ class Stage20ExteriorShell(Stage):
     def params(self, ctx: StageContext) -> Dict[str, Any]:
         c = ctx.config
         return {
-            "d3d_alpha": c.alpha_d3d_alpha,
-            "d3d_tol": c.alpha_d3d_tol,
-            "d3d_offset": c.alpha_d3d_offset,
-            "kdtree_radius": c.alpha_kdtree_radius,
-            "max_nn": c.alpha_max_nn,
-            "tangent_k": c.alpha_tangent_planes_k,
-            "poisson_depth": c.alpha_poisson_depth,
-            "poisson_ptweight": c.alpha_poisson_ptweight,
-            "fill_holes": c.alpha_fill_holes,
+            "voxel_size_A"  : c.shell_voxel_size_A,
+            "dilation_iters": c.shell_dilation_iters,
+            "closing_iters" : c.shell_closing_iters,
+            "gaussian_sigma": c.shell_gaussian_sigma,
+            "smooth_iters"  : c.shell_smooth_iters,
+            "fill_holes"    : c.shell_fill_holes,
         }
 
     def run(self, ctx: StageContext) -> None:
@@ -128,41 +183,25 @@ class Stage20ExteriorShell(Stage):
             stage=self.key,
             inputs_fp={"structure": inputs_fp["structure"]},
             params=params,
-            impl_version="v1",
+            impl_version="v2",
         )
 
         stage_dir = ctx.store.stage_dir(self.key)
         cached_files = [
             "alpha_shell.ply",
             "alpha_shell_quality.json",
-            "alpha_normals.ply",
-            "alpha_surface_points.npy",
             "ribosome_ptcloud.npy",
         ]
 
-        if stage_cache.has(
-            key, required=["alpha_shell.ply", "alpha_shell_quality.json"]
-        ):
+        if stage_cache.has(key, required=["alpha_shell.ply", "alpha_shell_quality.json"]):
             stage_cache.copy_into(key, stage_dir, cached_files)
-
             quality = json.loads((stage_dir / "alpha_shell_quality.json").read_text())
             ctx.inputs["alpha_shell_path"] = str(stage_dir / "alpha_shell.ply")
-            ctx.inputs["alpha_shell_watertight"] = bool(
-                quality.get("watertight", False)
-            )
-
-            ctx.store.register_file(
-                name="alpha_shell_mesh",
-                stage=self.key,
-                type=ArtifactType.PLY_MESH,
-                path=stage_dir / "alpha_shell.ply",
-            )
-            ctx.store.register_file(
-                name="alpha_shell_quality",
-                stage=self.key,
-                type=ArtifactType.JSON,
-                path=stage_dir / "alpha_shell_quality.json",
-            )
+            ctx.inputs["alpha_shell_watertight"] = bool(quality.get("watertight", False))
+            ctx.store.register_file(name="alpha_shell_mesh", stage=self.key,
+                                    type=ArtifactType.PLY_MESH, path=stage_dir / "alpha_shell.ply")
+            ctx.store.register_file(name="alpha_shell_quality", stage=self.key,
+                                    type=ArtifactType.JSON, path=stage_dir / "alpha_shell_quality.json")
             return
 
         c = ctx.config
@@ -170,9 +209,7 @@ class Stage20ExteriorShell(Stage):
         cifpath = Path(ctx.require("mmcif_path"))
 
         ptcloud_path = stage_dir / "ribosome_ptcloud.npy"
-        surface_pts_path = stage_dir / "alpha_surface_points.npy"
-        normals_pcd_path = stage_dir / "alpha_normals.ply"
-        mesh_path = stage_dir / "alpha_shell.ply"
+        mesh_path    = stage_dir / "alpha_shell.ply"
         quality_path = stage_dir / "alpha_shell_quality.json"
 
         wall = ribosome_wall_auth_asym_ids(
@@ -181,89 +218,43 @@ class Stage20ExteriorShell(Stage):
             extra_exclude=tunnel_debris_chains(ctx.rcsb_id, profile),
         )
         wall = intersect_with_first_assembly(profile, wall)
-
         ptcloud = cif_to_point_cloud(str(cifpath), sorted(wall), do_atoms=True)
 
         np.save(ptcloud_path, ptcloud)
-        ctx.store.register_file(
-            name="ribosome_ptcloud",
-            stage=self.key,
-            type=ArtifactType.NUMPY,
-            path=ptcloud_path,
+        ctx.store.register_file(name="ribosome_ptcloud", stage=self.key,
+                                type=ArtifactType.NUMPY, path=ptcloud_path)
+
+        mesh, watertight = _make_voxel_shell(
+            ptcloud,
+            voxel_size_A   = c.shell_voxel_size_A,
+            dilation_iters = c.shell_dilation_iters,
+            closing_iters  = c.shell_closing_iters,
+            gaussian_sigma = c.shell_gaussian_sigma,
+            smooth_iters   = c.shell_smooth_iters,
+            fill_holes     = c.shell_fill_holes,
         )
 
-        surface_pts = quick_surface_points(
-            ptcloud, c.alpha_d3d_alpha, c.alpha_d3d_tol, c.alpha_d3d_offset
-        ).astype(np.float32)
-        np.save(surface_pts_path, surface_pts)
-        ctx.store.register_file(
-            name="alpha_surface_points",
-            stage=self.key,
-            type=ArtifactType.NUMPY,
-            path=surface_pts_path,
-        )
-
-        normal_estimated_pcd = fast_normal_estimation(
-            surface_pts, c.alpha_kdtree_radius, c.alpha_max_nn, c.alpha_tangent_planes_k
-        )
-
-        center = normal_estimated_pcd.get_center()
-        normal_estimated_pcd.orient_normals_towards_camera_location(
-            camera_location=center
-        )
-        normal_estimated_pcd.normals = o3d.utility.Vector3dVector(
-            -np.asarray(normal_estimated_pcd.normals)
-        )
-
-        o3d.io.write_point_cloud(str(normals_pcd_path), normal_estimated_pcd)
-        ctx.store.register_file(
-            name="alpha_normals_pcd",
-            stage=self.key,
-            type=ArtifactType.PLY_PCD,
-            path=normals_pcd_path,
-        )
-
-        apply_poisson_reconstruction(
-            str(normals_pcd_path),
-            mesh_path,
-            recon_depth=c.alpha_poisson_depth,
-            recon_pt_weight=c.alpha_poisson_ptweight,
-        )
-
-        mesh = pv.read(mesh_path)
-        mesh = mesh.fill_holes(c.alpha_fill_holes)
-        mesh = mesh.connectivity(largest=True).triangulate()
-        mesh.save(mesh_path)
-
-        watertight = validate_mesh_pyvista(mesh)
+        mesh.save(str(mesh_path))
 
         quality = {
-            "watertight": bool(watertight),
-            "n_points": int(mesh.n_points),
-            "n_faces": int(mesh.n_faces),
-            "open_edges": int(mesh.n_open_edges),
+            "watertight" : bool(watertight),
+            "n_points"   : int(mesh.n_points),
+            "n_faces"    : int(mesh.n_faces_strict),
+            "open_edges" : int(mesh.n_open_edges),
             "is_manifold": bool(mesh.is_manifold),
-            "bounds": list(mesh.bounds),
+            "bounds"     : [float(x) for x in mesh.bounds],
         }
         quality_path.write_text(json.dumps(quality, indent=2))
-        ctx.store.register_file(
-            name="alpha_shell_quality",
-            stage=self.key,
-            type=ArtifactType.JSON,
-            path=quality_path,
-        )
 
-        ctx.store.register_file(
-            name="alpha_shell_mesh",
-            stage=self.key,
-            type=ArtifactType.PLY_MESH,
-            path=mesh_path,
-        )
+        ctx.store.register_file(name="alpha_shell_mesh", stage=self.key,
+                                type=ArtifactType.PLY_MESH, path=mesh_path)
+        ctx.store.register_file(name="alpha_shell_quality", stage=self.key,
+                                type=ArtifactType.JSON, path=quality_path)
         ctx.inputs["alpha_shell_path"] = str(mesh_path)
         ctx.inputs["alpha_shell_watertight"] = bool(watertight)
+
         if watertight:
             stage_cache.put_from(key, stage_dir, cached_files)
-
 class Stage30RegionAtoms(Stage):
     key = "30_region_atoms"
 
@@ -842,8 +833,11 @@ class Stage50Clustering(Stage):
         surf_w = clip_mesh_to_atom_clearance(surf_w, region_xyz, min_clearance_A=c.mesh_atom_clearance_A)
 
         dt = time.perf_counter() - t0
+        # print(f"[{self.key}]   MC mesh: {dt:.2f}s, {surf_w.n_points:,} pts, "
+        #       f"{surf_w.n_faces:,} faces, watertight={surf_w.is_manifold and surf_w.n_open_edges == 0}")
+
         print(f"[{self.key}]   MC mesh: {dt:.2f}s, {surf_w.n_points:,} pts, "
-              f"{surf_w.n_faces:,} faces, watertight={surf_w.is_manifold and surf_w.n_open_edges == 0}")
+            f"{surf_w.n_faces_strict:,} faces, watertight={surf_w.is_manifold and surf_w.n_open_edges == 0}")
 
         mesh_path = stage_dir / f"mesh_{level_name}.ply"
         save_mesh_with_ascii(surf_w, mesh_path, tag=level_name)
@@ -873,7 +867,8 @@ class Stage70MeshValidate(Stage):
         def _mesh_stats(m: pv.PolyData) -> dict:
             return {
                 "n_points": int(m.n_points),
-                "n_faces": int(m.n_faces),
+
+                "n_faces": int(m.n_faces_strict),
                 "open_edges": int(m.n_open_edges),
                 "is_manifold": bool(m.is_manifold),
                 "bounds": [float(x) for x in m.bounds],

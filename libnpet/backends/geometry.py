@@ -14,8 +14,6 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple, TypeVar
 
 import numpy as np
-import open3d as o3d
-import plyfile
 import pyvista as pv
 from Bio.PDB.MMCIFParser import MMCIFParser
 from scipy.spatial import cKDTree
@@ -115,28 +113,24 @@ def apply_poisson_reconstruction(
     recon_depth: int = 6,
     recon_pt_weight: float = 3.0,
 ) -> None:
-    print(
-        f"Rolling Poisson Reconstruction: {surf_estimated_ptcloud_path} -> {output_path}"
+    print(f"Open3D Poisson Reconstruction: {surf_estimated_ptcloud_path} -> {output_path}")
+    import open3d as o3d
+    pcd = o3d.io.read_point_cloud(str(surf_estimated_ptcloud_path))
+    if not pcd.has_normals():
+        raise ValueError(f"Point cloud at {surf_estimated_ptcloud_path} has no normals")
+
+    mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+        pcd, depth=recon_depth
     )
-    command = [
-        SETTINGS.poisson_recon_bin,
-        "--in",
-        str(surf_estimated_ptcloud_path),
-        "--out",
-        str(output_path),
-        "--depth",
-        str(recon_depth),
-        "--pointWeight",
-        str(recon_pt_weight),
-    ]
-    process = subprocess.run(
-        command, text=True
-    )  # no capture_output -- let it print live
-    if process.returncode != 0:
-        raise RuntimeError(
-            f"PoissonRecon failed with exit code {process.returncode}. "
-            f"Binary: {SETTINGS.poisson_recon_bin}"
-        )
+
+    # Trim low-density vertices; these tend to be spurious extrapolations
+    # at the boundary where point coverage is thin. 5% threshold is generous
+    # enough for a bounding shell.
+    densities = np.asarray(densities)
+    verts_to_remove = densities < np.quantile(densities, 0.05)
+    mesh.remove_vertices_by_mask(verts_to_remove)
+
+    o3d.io.write_triangle_mesh(str(output_path), mesh)
     print(f">>Wrote {output_path}")
 
 
@@ -269,7 +263,8 @@ def estimate_normals(
     kdtree_radius=None,
     kdtree_max_nn=None,
     correction_tangent_planes_n=None,
-) -> o3d.geometry.PointCloud:
+):
+    import open3d as o3d
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(convex_hull_surface_pts)
     pcd.estimate_normals(
@@ -335,6 +330,7 @@ def quick_surface_points(
         print(
             f"  [quick_surface_points] subsampled {len(pointcloud):,} -> {len(pts):,} points"
         )
+    import open3d as o3d
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pts.astype(np.float64))
@@ -362,7 +358,9 @@ def fast_normal_estimation(
     kdtree_radius: float,
     max_nn: int,
     tangent_planes_k: int,
-) -> o3d.geometry.PointCloud:
+):
+
+    import open3d as o3d
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(surface_pts)
     search_param = o3d.geometry.KDTreeSearchParamHybrid(

@@ -8,12 +8,13 @@ from typing import Any, Dict, Mapping, Optional
 
 
 class ArtifactType(str, Enum):
-    JSON = "json"
-    NUMPY = "npy"
+    JSON     = "json"
+    NUMPY    = "npy"
     PLY_MESH = "ply_mesh"
-    PLY_PCD = "ply_pcd"
-    PNG = "png"
-    TXT = "txt"
+    PLY_PCD  = "ply_pcd"
+    PNG      = "png"
+    TXT      = "txt"
+    MMCIF    = "mmcif"
 
 
 @dataclass(frozen=True)

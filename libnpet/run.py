@@ -13,7 +13,7 @@ from libnpet.core.store import LocalRunStore
 from libnpet.core.types import StageContext
 from libnpet.core.pipeline import Pipeline
 from libnpet.core.cache import LocalStageCache
-
+from libnpet.stages.tunnel_lining import Stage80TunnelLining
 from libnpet.stages.bootstrap import Stage00Inputs, Stage10Landmarks
 from libnpet.stages.grid_refine import Stage55GridRefine
 from libnpet.stages.legacy_minimal import (
@@ -96,6 +96,7 @@ def run_npet2(
         Stage50Clustering(),
         Stage55GridRefine(),
         Stage70MeshValidate(),
+        Stage80TunnelLining(),
     ])
 
     pipeline.run(ctx)

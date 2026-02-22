@@ -13,7 +13,6 @@ import numpy as np
 import pyvista as pv
 from scipy import ndimage
 import time
-import open3d as o3d
 
 from libnpet.core.pipeline import Stage
 from libnpet.core.types import StageContext, ArtifactType
@@ -547,7 +546,7 @@ class Stage55GridRefine(Stage):
         dt = time.perf_counter() - t0
         is_watertight = surf_w.is_manifold and surf_w.n_open_edges == 0
         print(f"[{self.key}]   MC mesh: {dt:.2f}s, {surf_w.n_points:,} pts, "
-              f"{surf_w.n_faces:,} faces, watertight={is_watertight}")
+            f"{surf_w.n_faces_strict:,} faces, ...")
 
         mesh_path = stage_dir / f"mesh_{level_name}.ply"
         save_mesh_with_ascii(surf_w, mesh_path, tag=level_name)

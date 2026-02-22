@@ -124,6 +124,12 @@ def _build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("--dbscan-refine-eps", type=float, metavar="A")
     cfg.add_argument("--dbscan-refine-min-samples", type=int)
 
+    cfg.add_argument("--lining-proximity", type=float, metavar="A",
+                    help="Atom-to-mesh proximity threshold for tunnel lining (default: 5.0A)")
+    cfg.add_argument("--no-nonpolymers", action="store_true",
+                    help="Exclude nonpolymer ligands/ions from lining output")
+    cfg.add_argument("--include-waters", action="store_true",
+                    help="Include water molecules in lining output")
     # -------------------------------------------------------------------------
     # show-config
     # -------------------------------------------------------------------------
@@ -166,6 +172,12 @@ def _build_config(args) -> "RunConfig":
             GridLevelConfig(name="level_0", voxel_size_A=args.voxel_size,
                             occupancy_backend="legacy_kdtree"),
         ]
+    if args.lining_proximity is not None:
+        kwargs["lining_proximity_A"] = args.lining_proximity
+    if args.no_nonpolymers:
+        kwargs["lining_include_nonpolymers"] = False
+    if args.include_waters:
+        kwargs["lining_include_waters"] = True
     return RunConfig(**kwargs)
 
 

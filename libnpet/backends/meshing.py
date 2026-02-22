@@ -61,7 +61,7 @@ def mesh_from_binary_volume(
     if fill_holes_size > 0:
         surf = surf.fill_holes(fill_holes_size)
 
-    surf = surf.connectivity(largest=True)
+    surf = surf.connectivity(extraction_mode='largest')
 
     pre_smooth = surf.compute_normals(auto_orient_normals=True, consistent_normals=True)
 
