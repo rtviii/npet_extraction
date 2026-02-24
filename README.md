@@ -47,7 +47,7 @@ pip install -U pip setuptools
 pip install .
 ```
 
-### Simply run this (local; ribosome.xyz for deps/landmarks)
+### Simply run this (local; all dependencies will be pulled from ribosome.xyz)
 
 ```bash
 npet2 run 5NWY
@@ -55,15 +55,17 @@ npet2 run 5NWY
 
 ---
 
-## Install & run (Docker)
+## Install(Docker)
 
 ### Build
 
 ```bash
+git clone https://github.com/rtviii/npet_extraction
+cd npet_extraction
 docker build -t npet2:latest .
 ```
 
-### Simply run this (Docker; ribosome.xyz for deps/landmarks)
+### Run this (Docker; all dependencies will be pulled from ribosome.xyz)
 
 ```bash
 mkdir -p ./npet2_data
@@ -101,7 +103,7 @@ A run is written under:
 
 Key files:
 
-* `manifest.json` (run ledger + artifact index) — [`libnpet/core/manifest.py`](https://github.com/rtviii/npet_extraction/blob/main/libnpet/core/manifest.py)
+* `manifest.json` (a given run's ledger + artifact index) — [`libnpet/core/manifest.py`](https://github.com/rtviii/npet_extraction/blob/main/libnpet/core/manifest.py)
 * `tunnel_mesh.ply` / `tunnel_mesh_ascii.ply` (final watertight tunnel mesh)
 * `tunnel_lining.json` + `tunnel_lining.cif` (lining report + extracted chains)
 
@@ -128,10 +130,12 @@ Provider logic: [`libnpet/adapters/standalone_providers.py`](https://github.com/
 ### Defaults (no files)
 
 * mmCIF: downloaded from RCSB + cached under `${NPET2_ROOT}/mmcif/{RCSB_ID}/{RCSB_ID}.cif`
-* profile: ribosome.xyz API
-* landmarks (PTC + constriction): ribosome.xyz API
+* ribososome profile: ribosome.xyz API
+* landmarks necessary for identifying the tunnel space (PTC + constriction): ribosome.xyz API
 
 ### Override with local files
+
+In case you'd like to provide your own landmarks or ribosome.xyz api being down you can specify them as follows. The format of these files must conform to the expected schema (defined below; basically must have a top-level `location` field for both landmarks with every other additional field being optinal/ignored).
 
 ```bash
 # local mmCIF, API for profile + landmarks
@@ -187,7 +191,6 @@ CLI implementation: [`libnpet/__main__.py`](https://github.com/rtviii/npet_extra
 
 ### Commands
 
-* `npet2 setup` — build/install external binaries (PoissonRecon) under `$NPET2_ROOT/bin/`
 * `npet2 show-config` — print default [`RunConfig`](https://github.com/rtviii/npet_extraction/blob/main/libnpet/core/config.py) as JSON
 * `npet2 run` — run the pipeline
 
